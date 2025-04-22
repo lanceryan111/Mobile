@@ -1,1 +1,78 @@
+好的！下面是 Android Gradle Plugin 自动生成的构建任务命名规律一览表，非常实用，尤其是在你有多个 flavor + buildType 时。
 
+⸻
+
+任务命名规律一览表
+
+假设你有如下配置：
+
+productFlavors {
+    demo { ... }
+    full { ... }
+}
+
+buildTypes {
+    debug { ... }
+    release { ... }
+}
+
+就会生成这些 variant：
+
+demoDebug, demoRelease, fullDebug, fullRelease
+
+然后 Gradle 会根据这些组合自动生成任务：
+
+任务类型	命名格式	作用说明
+Assemble APK	assemble<Flavor><BuildType>	编译并生成 APK（不包括 bundle）
+Bundle AAB	bundle<Flavor><BuildType>	生成 AAB 文件（App Bundle）
+Install APK 到设备	install<Flavor><BuildType>	构建并安装到连接的设备或模拟器
+测试（单元测试）	test<Flavor><BuildType>UnitTest	运行 JVM 层的单元测试
+测试（UI 测试）	connected<Flavor><BuildType>AndroidTest	运行连接设备上的 instrumented 测试
+签名 APK（release 用）	sign<Flavor><BuildType>（可能是内部 task）	负责 release 版的签名处理（AGP 内部用）
+
+
+
+⸻
+
+具体示例
+
+如果你有 demo 和 full flavor，和 debug 和 release buildType：
+
+构建组合	APK 任务名	AAB 任务名	安装任务名
+demoDebug	assembleDemoDebug	bundleDemoDebug	installDemoDebug
+demoRelease	assembleDemoRelease	bundleDemoRelease	installDemoRelease
+fullDebug	assembleFullDebug	bundleFullDebug	installFullDebug
+fullRelease	assembleFullRelease	bundleFullRelease	installFullRelease
+
+
+
+⸻
+
+其他有用的组合任务
+
+任务名	作用
+assemble	构建所有 APK（所有变体）
+bundle	构建所有 AAB（所有变体）
+assembleDebug	构建所有 debug 类型的 APK（所有 flavor）
+bundleRelease	构建所有 release 类型的 AAB（所有 flavor）
+publish	发布（如果你配置了 publishing）
+
+
+
+⸻
+
+查看具体 task
+
+你也可以运行这个命令看看每个变体实际对应了哪些任务：
+
+./gradlew :app:tasks --group build
+
+或者这个查看所有变体：
+
+./gradlew :app:properties | grep -i variant
+
+
+
+⸻
+
+如果你正在写 CI 脚本或自动发布流程，这份命名规则非常实用。如果你想我帮你写某个具体组合的构建脚本也可以告诉我！
