@@ -76,3 +76,168 @@ publish	发布（如果你配置了 publishing）
 ⸻
 
 如果你正在写 CI 脚本或自动发布流程，这份命名规则非常实用。如果你想我帮你写某个具体组合的构建脚本也可以告诉我！
+
+
+非常好的问题，这关系到 Android 应用打包和发布的核心概念。我们来一步步讲清楚：
+
+⸻
+
+1. 什么是 bundle？
+
+在 Gradle 里，bundle<Flavor><BuildType> 是一个 任务，它的作用是：
+
+生成 .aab 文件（Android App Bundle），而不是 .apk。
+
+⸻
+
+2. 什么是 .aab 和 .apk？它们有什么区别？
+
+项目	.apk（Android Package）	.aab（Android App Bundle）
+本质	最终用户安装的应用包	开发者上传给 Google Play 的应用包
+安装方式	可以直接安装到手机	无法直接安装，需要通过 Google Play 生成 apk
+包含内容	包含所有资源和代码（即便某些手机用不到）	是一个“资源压缩包”，里面包含各设备配置对应的资源和代码
+优点	简单直接，自己分发方便	更小的安装包、更快的下载、更智能的资源分发
+缺点	包含所有资源，体积大	无法直接安装，调试麻烦，需要 Play Store 或使用 bundletool
+用途	用于内部测试、渠道分发	用于 Google Play 发布
+
+
+
+⸻
+
+一句话总结：
+	•	.apk 是传统的、可直接安装的应用包。
+	•	.aab 是新的发布格式，Google Play 要求必须上传 .aab，它能根据用户设备动态生成更小的 .apk。
+
+⸻
+
+3. 为什么要用 bundle？为什么要生成 .aab？
+
+主要原因：Google Play 要求
+
+自 2021 年 8 月起，所有新上架的应用必须使用 .aab 格式上传，不再接受 .apk。
+
+当你运行：
+
+./gradlew bundleRelease
+
+你得到的是一个 .aab 文件，它不能直接安装，但可以上传到 Google Play，Play 会自动生成合适的 .apk 安装包并推送给用户。
+
+⸻
+
+4. .aab 和 .apk 之间的关系？
+
+可以这样理解：
+
+.aab （源码打包） --> Play Store --> 针对设备生成 .apk（安装包）
+
+或者你本地也可以用 Google 的工具：
+
+bundletool build-apks --bundle=app.aab --output=output.apks
+bundletool install-apks --apks=output.apks
+
+就可以从 .aab 生成 .apk 并安装。
+
+⸻
+
+5. 开发和测试时还要用 .apk 吗？
+
+是的，开发调试时用 .apk 更方便，比如：
+
+./gradlew assembleDebug
+./gradlew installDebug
+
+因为 .aab 无法直接装，调试麻烦。
+
+所以很多项目会 同时构建 .apk 和 .aab：
+	•	.apk：用于测试、内部分发；
+	•	.aab：用于发布到 Google Play；
+
+⸻
+
+如果你正在写一个自动打包脚本或准备发布到 Google Play，建议两种格式都生成。需要我给你写个一键打包 .apk 和 .aab 的 Gradle 任务吗？
+
+完美，那我们来加上 打包后自动拷贝 .apk 和 .aab 到统一目录的逻辑，输出路径统一为：
+
+app/build/outputs/releaseArtifacts/
+
+
+
+⸻
+
+完整脚本（包含打包 + 拷贝逻辑）
+
+放进你的 app/build.gradle：
+
+android.applicationVariants.all { variant ->
+    def variantName = variant.name.capitalize()
+    def flavorName = variant.flavorName
+    def buildTypeName = variant.buildType.name.capitalize()
+
+    // 构建路径变量
+    def outputBase = "${project.buildDir}/outputs"
+    def outputDir = "${outputBase}/releaseArtifacts"
+    def apkOutput = "${outputBase}/apk/${variant.name}/${project.archivesBaseName}-${variant.name}.apk"
+    def aabOutput = "${outputBase}/bundle/${variant.name}/${project.archivesBaseName}-${variant.name}.aab"
+
+    // 拷贝 APK 任务
+    def copyApkTask = tasks.register("copy${variantName}Apk", Copy) {
+        dependsOn "assemble${variantName}"
+        from(apkOutput)
+        into(outputDir)
+        rename { String fileName -> "${variant.name}.apk" }
+    }
+
+    // 拷贝 AAB 任务
+    def copyAabTask = tasks.register("copy${variantName}Aab", Copy) {
+        dependsOn "bundle${variantName}"
+        from(aabOutput)
+        into(outputDir)
+        rename { String fileName -> "${variant.name}.aab" }
+    }
+
+    // 单独构建 APK + 拷贝
+    tasks.register("build${variantName}Apk") {
+        group = "custom build"
+        description = "Build and copy APK for ${variant.name}"
+        dependsOn copyApkTask
+    }
+
+    // 单独构建 AAB + 拷贝
+    tasks.register("build${variantName}Aab") {
+        group = "custom build"
+        description = "Build and copy AAB for ${variant.name}"
+        dependsOn copyAabTask
+    }
+
+    // 同时构建 APK + AAB + 拷贝
+    tasks.register("build${variantName}All") {
+        group = "custom build"
+        description = "Build and copy both APK & AAB for ${variant.name}"
+        dependsOn copyApkTask, copyAabTask
+    }
+}
+
+
+
+⸻
+
+使用方式：
+
+./gradlew buildFullReleaseAll
+
+构建并自动拷贝结果到：
+
+app/build/outputs/releaseArtifacts/
+├── fullRelease.apk
+└── fullRelease.aab
+
+
+
+⸻
+
+可选优化：
+	•	如果你有签名信息配置在 release 中，这个流程支持直接打正式签名包；
+	•	如果你希望加上时间戳、Git commit hash 来命名，也可以加上；
+	•	如果你使用 CI/CD，如 GitHub Actions、Jenkins，也可以直接用这些任务作为构建步骤；
+
+要不要我帮你加个时间戳命名功能？比如生成的文件叫 fullRelease_20250422_1830.apk？
