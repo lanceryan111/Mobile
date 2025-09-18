@@ -1,21 +1,21 @@
-Looking Back:
+好的，我帮你把 Looking Back 和 Looking Forward 两部分优化，使其更加精炼、专业，同时逻辑更清晰：
 
-· This year, I am particularly proud of leading the GitHub Migration initiative, exploring post-release automation, and collaborating effectively with multiple Lines of Business (LoBs). These experiences allowed me to take on greater responsibilities and independently drive several key projects and programs.
-· I made significant progress toward all our PI Objectives, which will remain a top priority in the coming quarter. I am committed to achieving PI planning goals while delivering high-impact, results-driven services to all partner teams.
-· I provided mentorship to junior colleagues by sharing best practices in software engineering based on my experience, contributing to their growth and the team’s overall capabilities.
+⸻
 
-Looking Forward:
+Looking Back
 
-· I plan to build on last quarter’s successes, with a primary focus on leading the roadmap for TDU GitHub Migration.
-· I aim to further deepen my expertise and continue developing as a senior engineer to help elevate code standards and quality from the Mobile to the Online team.
-· These efforts will enhance our platform’s performance and robustness while creating opportunities for me to advance both technically and as a leader.
+This year, I played a key role in leading GitHub migrations across Canadian Mobile, ensuring consistency and alignment across products. I strengthened my technical leadership by executing Post-Release Automation projects and collaborating effectively with multiple Lines of Business (LoBs). These experiences allowed me to take on greater responsibilities and independently deliver several high-impact initiatives.
 
----
+I made significant progress toward our PI Objectives, a focus I will continue to prioritize in the coming fiscal year. Alongside achieving planning goals, I delivered reliable, results-driven services to partner teams. Additionally, I provided mentorship to junior colleagues by sharing best practices in software engineering, contributing to both their professional growth and the team’s overall capabilities.
 
-改写说明：
+⸻
 
-· 提升表达的专业和精炼度：对句子结构和用词进行了优化，使内容更简洁明晰，贴合专业职场语境。
-· 突出领导力和技术贡献：强化了在项目推动、团队协作和技术提升方面的主动角色和影响。
-· 统一术语和逻辑衔接：对相关技术和管理术语进行了统一处理，并增强了前后内容间的逻辑连贯性。
+Looking Forward
 
-如果您需要更正式或侧重于某一技术方向的表达，我可以进一步为您调整内容。
+Building on this year’s successes, I will focus on leading the roadmap for Post-Release Automation. I aim to deepen my expertise and continue growing as a senior engineer, helping to elevate code standards and quality from Mobile to the Online team.
+
+These efforts will further strengthen our platform’s performance and robustness while providing opportunities for me to grow both technically and as a leader.
+
+⸻
+
+要不要我帮你再压缩成一个更简洁、适合 年度总结/晋升文档 的版本（去掉一些叙述性语言，强调成果 + 目标）？
