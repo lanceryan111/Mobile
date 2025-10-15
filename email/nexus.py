@@ -1,4 +1,4 @@
-当然可以 👍 下面是一封专业、清晰、适合发给多个技术团队的 draft 邮件，你可以根据内部语气调整语调（我默认是偏正式但不生硬的版本）：
+非常好，这是一个关键点 👍 你希望邮件语气上更像是“通知和协调角色（facilitator）”，而不是“owner 或执行方”。下面是修改后的版本，语气中立、强调信息传递与协调，不承担迁移责任：
 
 ⸻
 
@@ -6,30 +6,35 @@ Subject: Heads-up: Upcoming HA Nexus Migration – Action Required
 
 Hi everyone,
 
-As part of our infrastructure improvement efforts, we will soon be migrating our existing Nexus instance to a new High Availability (HA) Nexus environment.
+We’d like to give you an early heads-up about the upcoming Nexus migration to a new High Availability (HA) Nexus environment being coordinated by the [Infrastructure/DevOps] team.
 
-This migration aims to improve stability, scalability, and performance of artifact management across all teams.
+Our team is helping facilitate the communication and coordination across all impacted teams.
 
-What you need to do
+What this means for your team
 
 Each team’s tech asset owner will need to:
-	1.	Update the Nexus endpoint URL in your configurations, scripts, and tools to point to the new HA Nexus endpoint.
-	2.	Update your build scripts (e.g., pipeline configurations, dependency URLs, artifact upload paths) accordingly.
+	1.	Update the Nexus endpoint URL in your configurations, scripts, and tools once the new HA Nexus environment is available.
+	2.	Update build scripts or pipeline configurations that reference the current Nexus URL.
 
-We will share the exact migration timeline, new Nexus endpoint, and detailed migration guide shortly. This message is just an early heads-up so your teams can plan any required changes in advance.
-
-If you have automated processes depending on the current Nexus URL, please start identifying where updates will be needed.
+We’re sharing this notice in advance so your teams can plan and prepare for these updates ahead of time.
 
 Next Steps
-	•	Migration schedule and details: to be announced
-	•	Support channel for migration-related questions: [insert contact or Teams channel]
+	•	The Infrastructure team will provide the exact migration schedule, new Nexus endpoint, and a detailed migration guide in a separate communication.
+	•	Once details are shared, please ensure your team reviews and applies the necessary updates.
+	•	For migration-specific questions, please reach out to the Infrastructure team directly via [insert contact or Teams channel].
 
-Thank you for your cooperation in ensuring a smooth transition to the new HA Nexus environment.
+Thank you for your attention and for supporting a smooth transition to the new HA Nexus environment.
 
 Best regards,
 [Your Name]
-[Your Team or Department]
+on behalf of [Your Team Name]
 
 ⸻
 
-是否需要我帮你加上一个示例，比如旧 Nexus URL 和新 Nexus URL 的占位符？那样各 team 更容易理解要改什么位置。
+这个版本的特点是：
+	•	明确说明“我们是facilitator”，非owner；
+	•	指出真正负责迁移的是Infrastructure team；
+	•	语气礼貌且责任边界清晰；
+	•	仍保留了收件方必须行动的指引。
+
+是否希望我帮你加上 placeholder（例如旧 Nexus URL / 新 URL 的格式），让团队更容易理解要改的地方？
