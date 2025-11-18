@@ -1,0 +1,90 @@
+name: Advanced System Diagnostics
+
+on:
+  workflow_dispatch:
+    inputs:
+      run-stress-test:
+        description: 'Run container stress test'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  advanced-diagnostics:
+    runs-on: [self-hosted, linux, x64]
+    
+    steps:
+    - name: Comprehensive System Check
+      run: |
+        echo "=== Comprehensive System Diagnostics ==="
+        
+        # Hardware details
+        echo "--- Hardware ---"
+        echo "CPU Cores: $(nproc)"
+        echo "Total Memory: $(grep MemTotal /proc/meminfo | awk '{print $2 $3}')"
+        echo "Swap: $(grep SwapTotal /proc/meminfo | awk '{print $2 $3}')"
+        
+        # Load average
+        echo "Load Average: $(cat /proc/loadavg)"
+        
+        # Disk details
+        echo "--- Disk Details ---"
+        lsblk 2>/dev/null || echo "lsblk not available"
+        
+        # Service status
+        echo "--- Key Services ---"
+        services=("docker" "ssh" "nginx" "httpd")
+        for service in "${services[@]}"; do
+          if systemctl list-unit-files | grep -q "$service"; then
+            status=$(systemctl is-active $service 2>/dev/null || echo "not-found")
+            echo "$service: $status"
+          fi
+        done
+
+    - name: Docker Deep Inspection
+      run: |
+        echo "=== Docker Deep Inspection ==="
+        
+        if command -v docker &> /dev/null; then
+          echo "Docker system info:"
+          docker system info 2>/dev/null | grep -E "(Containers|Images|Storage Driver|Logging Driver)" || true
+          
+          echo "Active containers:"
+          docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" || true
+          
+          echo "Docker images:"
+          docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}" | head -10 || true
+        fi
+
+    - name: Container Stress Test
+      if: ${{ inputs.run-stress-test }}
+      run: |
+        echo "=== Running Container Stress Test ==="
+        
+        # Test multiple container types
+        echo "1. Testing Alpine Linux container..."
+        docker run --rm alpine:latest echo "✅ Alpine test passed"
+        
+        echo "2. Testing Ubuntu container..."
+        docker run --rm ubuntu:latest echo "✅ Ubuntu test passed" 
+        
+        echo "3. Testing network connectivity from container..."
+        docker run --rm appropriate/curl curl -s --connect-timeout 5 http://httpbin.org/get >/dev/null && \
+          echo "✅ Container network test passed" || \
+          echo "❌ Container network test failed"
+        
+        echo "✅ All container tests completed"
+
+    - name: Security Context Check
+      run: |
+        echo "=== Security Context ==="
+        echo "SELinux status: $(getenforce 2>/dev/null || echo 'Not available')"
+        echo "Firewall status: $(systemctl is-active firewalld 2>/dev/null || echo 'firewalld not active')"
+        
+        # Check for common security tools
+        security_tools=("fail2ban" "clamav" "rkhunter")
+        for tool in "${security_tools[@]}"; do
+          if command -v $tool &> /dev/null || rpm -q $tool &> /dev/null; then
+            echo "🔒 $tool: Installed"
+          fi
+        done
