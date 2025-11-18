@@ -1,0 +1,155 @@
+name: System Diagnostics and Docker Validation
+
+on:
+  workflow_dispatch:  # 允许手动触发
+  push:
+    branches: [ main, master ]
+  schedule:
+    - cron: '0 0 * * 0'  # 每周运行一次
+
+jobs:
+  system-diagnostics:
+    name: System Health Check
+    runs-on: [self-hosted, linux, x64]  # 匹配您的自托管runner标签
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Basic System Information
+      run: |
+        echo "=== System Information ==="
+        echo "Hostname: $(hostname)"
+        echo "Kernel: $(uname -r)"
+        echo "Architecture: $(uname -m)"
+        
+        echo "=== OS Release ==="
+        if [ -f /etc/redhat-release ]; then
+          cat /etc/redhat-release
+        elif [ -f /etc/os-release ]; then
+          cat /etc/os-release
+        else
+          echo "Unknown OS"
+        fi
+        
+        echo "=== Uptime ==="
+        uptime
+
+    - name: Memory and CPU Information
+      run: |
+        echo "=== Memory Info ==="
+        free -h
+        
+        echo "=== CPU Info ==="
+        lscpu | grep -E "(CPU\(s\)|Model name|Architecture)"
+        
+        echo "=== Disk Usage ==="
+        df -h
+
+    - name: Docker Validation
+      run: |
+        echo "=== Docker Status ==="
+        if command -v docker &> /dev/null; then
+          echo "Docker is installed"
+          docker --version
+          
+          echo "=== Docker Daemon Status ==="
+          sudo systemctl status docker --no-pager || echo "Unable to check docker service"
+          
+          echo "=== Docker Info ==="
+          docker info 2>/dev/null | head -20 || echo "Docker daemon might not be running"
+        else
+          echo "Docker is NOT installed"
+          exit 1
+        fi
+
+    - name: Test Docker Container
+      run: |
+        echo "=== Testing Docker Container ==="
+        if docker ps &> /dev/null; then
+          echo "Pulling and running test container..."
+          docker run --rm hello-world
+          echo "✅ Docker container test completed successfully"
+        else
+          echo "❌ Cannot connect to Docker daemon"
+          echo "Checking Docker socket permissions..."
+          ls -la /var/run/docker.sock 2>/dev/null || echo "Docker socket not found"
+          exit 1
+        fi
+
+    - name: Network and Connectivity Check
+      run: |
+        echo "=== Network Information ==="
+        ip addr show | grep inet | head -10
+        
+        echo "=== Connectivity Test ==="
+        ping -c 2 google.com && echo "✅ External connectivity: OK" || echo "❌ External connectivity: Failed"
+
+    - name: DevOps Tools Check
+      run: |
+        echo "=== DevOps Tools Availability ==="
+        
+        tools=("git" "curl" "wget" "tar" "gzip" "jq" "python3" "java" "node" "npm" "aws")
+        
+        for tool in "${tools[@]}"; do
+          if command -v $tool &> /dev/null; then
+            version=$($tool --version 2>/dev/null | head -1)
+            echo "✅ $tool: $version"
+          else
+            echo "❌ $tool: Not found"
+          fi
+        done
+
+    - name: User and Permission Check
+      run: |
+        echo "=== User Information ==="
+        echo "Current user: $(whoami)"
+        echo "User ID: $(id -u)"
+        echo "Group ID: $(id -g)"
+        echo "Groups: $(groups)"
+        
+        echo "=== Sudo Privileges ==="
+        if sudo -n true 2>/dev/null; then
+          echo "✅ User has sudo privileges"
+        else
+          echo "⚠️  User may not have sudo privileges"
+        fi
+
+    - name: Generate System Report
+      run: |
+        echo "=== SYSTEM DIAGNOSTICS REPORT ===" > system-report.md
+        echo "Generated: $(date)" >> system-report.md
+        echo "" >> system-report.md
+        
+        # OS Info
+        echo "## Operating System" >> system-report.md
+        if [ -f /etc/redhat-release ]; then
+          cat /etc/redhat-release >> system-report.md
+        fi
+        echo "" >> system-report.md
+        
+        # Memory
+        echo "## Memory" >> system-report.md
+        free -h >> system-report.md
+        echo "" >> system-report.md
+        
+        # Docker Status
+        echo "## Docker Status" >> system-report.md
+        if command -v docker &> /dev/null; then
+          docker --version >> system-report.md
+          echo "✅ Docker operational" >> system-report.md
+        else
+          echo "❌ Docker not available" >> system-report.md
+        fi
+        echo "" >> system-report.md
+        
+        # Upload report
+        echo "Report generated: system-report.md"
+
+    - name: Upload Diagnostics Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: system-diagnostics-report
+        path: |
+          system-report.md
+        retention-days: 7
