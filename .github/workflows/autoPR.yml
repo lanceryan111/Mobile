@@ -1,0 +1,135 @@
+name: Test Auto Merge PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      pull_number:
+        description: 'PR number to merge'
+        required: true
+        type: number
+      merge_method:
+        description: 'Merge method'
+        required: false
+        default: 'squash'
+        type: choice
+        options:
+          - merge
+          - squash
+          - rebase
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  GITHUB_API_URL: https://github.com/TD-Universe/api/v3
+
+jobs:
+  test-merge-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR Status Before Merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🔍 Checking PR #${{ inputs.pull_number }} status..."
+          
+          # 先打印完整 URL 用于调试
+          API_URL="${GITHUB_API_URL}/repos/${{ github.repository }}/pulls/${{ inputs.pull_number }}"
+          echo "API URL: $API_URL"
+          
+          # 获取响应并保存 HTTP 状态码
+          http_response=$(curl -s -w "\nHTTP_CODE:%{http_code}" -L \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "$API_URL")
+          
+          # 分离 body 和 status code
+          http_code=$(echo "$http_response" | grep "HTTP_CODE:" | cut -d: -f2)
+          pr_info=$(echo "$http_response" | grep -v "HTTP_CODE:")
+          
+          echo "HTTP Status Code: $http_code"
+          
+          # 检查 HTTP 状态
+          if [ "$http_code" != "200" ]; then
+            echo "❌ API request failed with status $http_code"
+            echo "Response: $pr_info"
+            exit 1
+          fi
+          
+          # 验证是否为有效 JSON
+          if ! echo "$pr_info" | jq . > /dev/null 2>&1; then
+            echo "❌ Invalid JSON response:"
+            echo "$pr_info" | head -50
+            exit 1
+          fi
+          
+          echo "PR State: $(echo "$pr_info" | jq -r '.state')"
+          echo "Mergeable: $(echo "$pr_info" | jq -r '.mergeable')"
+          echo "Mergeable State: $(echo "$pr_info" | jq -r '.mergeable_state')"
+          
+          state=$(echo "$pr_info" | jq -r '.state')
+          if [ "$state" != "open" ]; then
+            echo "❌ PR is not open (state: $state)"
+            exit 1
+          fi
+          
+          echo "✅ PR is open and ready for merge test"
+
+      - name: Merge Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🚀 Merging PR #${{ inputs.pull_number }}..."
+          
+          API_URL="${GITHUB_API_URL}/repos/${{ github.repository }}/pulls/${{ inputs.pull_number }}/merge"
+          echo "Merge API URL: $API_URL"
+          
+          response=$(curl -s -w "\nHTTP_CODE:%{http_code}" -L \
+            -X PUT \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "$API_URL" \
+            -d '{
+              "commit_title": "Auto merge PR #${{ inputs.pull_number }}",
+              "commit_message": "Merged via GitHub Actions workflow test",
+              "merge_method": "${{ inputs.merge_method }}"
+            }')
+          
+          http_code=$(echo "$response" | grep "HTTP_CODE:" | cut -d: -f2)
+          body=$(echo "$response" | grep -v "HTTP_CODE:")
+          
+          echo "HTTP Status Code: $http_code"
+          
+          case "$http_code" in
+            200)
+              echo "✅ Merge successful!"
+              echo "$body" | jq . 2>/dev/null || echo "$body"
+              ;;
+            403)
+              echo "❌ Permission denied (403)"
+              echo "$body"
+              exit 1
+              ;;
+            404)
+              echo "❌ PR not found (404)"
+              exit 1
+              ;;
+            405)
+              echo "❌ Merge not allowed (405) - check branch protection"
+              echo "$body"
+              exit 1
+              ;;
+            409)
+              echo "❌ Conflict (409)"
+              echo "$body"
+              exit 1
+              ;;
+            *)
+              echo "❌ Unexpected status: $http_code"
+              echo "$body"
+              exit 1
+              ;;
+          esac
