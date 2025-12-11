@@ -1,0 +1,180 @@
+- name: Check PR Status Before Merge
+  id: check_pr_status
+  run: |
+    echo "🔍 Checking PR #${{ github.event.pull_request.number }} status..."
+    
+    API_URL="${{ github.event.pull_request.url }}"
+    MAX_RETRIES=5
+    RETRY_DELAY=3
+    
+    for i in $(seq 1 $MAX_RETRIES); do
+      echo "Attempt $i/$MAX_RETRIES..."
+      
+      body=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                   -H "Accept: application/vnd.github.v3+json" \
+                   "$API_URL")
+      
+      echo "API URL: $API_URL"
+      echo "HTTP status code: $(curl -s -o /dev/null -w '%{http_code}' \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "$API_URL")"
+      
+      state=$(echo "$body" | jq -r '.state')
+      mergeable=$(echo "$body" | jq -r '.mergeable')
+      mergeable_state=$(echo "$body" | jq -r '.mergeable_state')
+      
+      echo "PR State: $state"
+      echo "Mergeable: $mergeable"
+      echo "Mergeable State: $mergeable_state"
+      
+      # 如果 mergeable 不是 null，跳出循环
+      if [[ "$mergeable" != "null" && "$mergeable" != "" ]]; then
+        echo "✅ Got valid mergeable status"
+        break
+      fi
+      
+      if [[ $i -lt $MAX_RETRIES ]]; then
+        echo "⏳ Mergeable status is null/unknown, retrying in ${RETRY_DELAY}s..."
+        sleep $RETRY_DELAY
+      else
+        echo "❌ Failed to get mergeable status after $MAX_RETRIES attempts"
+        exit 1
+      fi
+    done
+    
+    # 检查 PR 状态
+    if [[ "$state" != "open" ]]; then
+      echo "❌ PR is not open (state: $state)"
+      exit 1
+    fi
+    
+    # 检查是否可合并
+    if [[ "$mergeable" != "true" ]]; then
+      echo "❌ PR is not mergeable (mergeable: $mergeable, state: $mergeable_state)"
+      exit 1
+    fi
+    
+    echo "✅ PR is open and ready for merge"
+    echo "MERGEABLE_CHECK=true" >> $GITHUB_OUTPUT
+
+- name: Merge Pull Request
+  if: ${{ steps.check_pr_status.outputs.MERGEABLE_CHECK == 'true' }}
+  run: |
+    echo "🚀 Attempting to merge PR #${{ inputs.pull_number }} using ${{ inputs.merge_method }} method..."
+    
+    MERGE_API_URL="${{ env.GITHUB_API_URL }}/${{ env.REPO }}/pulls/${{ inputs.pull_number }}/merge"
+    echo "Merge URL: $MERGE_API_URL"
+    
+    MAX_RETRIES=3
+    RETRY_DELAY=2
+    MERGED=false
+    
+    for i in $(seq 1 $MAX_RETRIES); do
+      echo "----------------------------------------"
+      echo "Merge attempt $i/$MAX_RETRIES..."
+      
+      http_response=$(curl -s -w "\nHTTP_CODE:%{http_code}" -L \
+        -X PUT \
+        -H "Accept: application/vnd.github+json" \
+        -H "Authorization: Bearer ${{ secrets.GHTOKEN }}" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "$MERGE_API_URL" \
+        -d '{
+          "commit_title": "Auto merge PR #${{ inputs.pull_number }}",
+          "commit_message": "Merged via GitHub Actions workflow test",
+          "merge_method": "${{ inputs.merge_method }}"
+        }')
+      
+      http_code=$(echo "$http_response" | grep "HTTP_CODE:" | cut -d: -f2)
+      body=$(echo "$http_response" | grep -v "HTTP_CODE:")
+      
+      echo "Response Code: $http_code"
+      echo "Response Body: $body"
+      
+      # 检查 HTTP 状态码
+      if [[ "$http_code" == "200" ]]; then
+        echo "✅ PR merged successfully (HTTP 200)"
+        MERGED=true
+        break
+      elif [[ "$http_code" == "405" ]]; then
+        # 405 可能意味着 PR 已经被合并了
+        echo "⚠️ Got HTTP 405 - checking if PR is already merged..."
+        
+        # 检查 PR 状态
+        pr_status=$(curl -s -H "Authorization: Bearer ${{ secrets.GHTOKEN }}" \
+                         -H "Accept: application/vnd.github+json" \
+                         "${{ github.event.pull_request.url }}")
+        
+        merged=$(echo "$pr_status" | jq -r '.merged')
+        pr_state=$(echo "$pr_status" | jq -r '.state')
+        
+        echo "PR merged status: $merged"
+        echo "PR state: $pr_state"
+        
+        if [[ "$merged" == "true" ]]; then
+          echo "✅ PR is already merged!"
+          MERGED=true
+          break
+        else
+          echo "❌ PR is not merged and got 405 error"
+        fi
+      elif [[ "$http_code" == "409" ]]; then
+        echo "⚠️ Merge conflict detected (HTTP 409)"
+        echo "❌ Cannot merge due to conflicts"
+        exit 1
+      elif [[ "$http_code" == "" || "$http_code" == "null" ]]; then
+        echo "⚠️ Empty response code, checking PR merge status..."
+        
+        # 检查 PR 是否实际被合并了
+        sleep 2
+        pr_status=$(curl -s -H "Authorization: Bearer ${{ secrets.GHTOKEN }}" \
+                         -H "Accept: application/vnd.github+json" \
+                         "${{ github.event.pull_request.url }}")
+        
+        merged=$(echo "$pr_status" | jq -r '.merged')
+        
+        if [[ "$merged" == "true" ]]; then
+          echo "✅ PR was successfully merged (verified by status check)"
+          MERGED=true
+          break
+        else
+          echo "⏳ PR not merged yet, will retry..."
+        fi
+      else
+        echo "⚠️ Unexpected HTTP code: $http_code"
+      fi
+      
+      if [[ $i -lt $MAX_RETRIES ]]; then
+        echo "⏳ Retrying in ${RETRY_DELAY}s..."
+        sleep $RETRY_DELAY
+      fi
+    done
+    
+    # 最终验证
+    if [[ "$MERGED" == "false" ]]; then
+      echo "----------------------------------------"
+      echo "🔍 Final verification: checking PR merge status..."
+      
+      pr_status=$(curl -s -H "Authorization: Bearer ${{ secrets.GHTOKEN }}" \
+                       -H "Accept: application/vnd.github+json" \
+                       "${{ github.event.pull_request.url }}")
+      
+      merged=$(echo "$pr_status" | jq -r '.merged')
+      merge_commit_sha=$(echo "$pr_status" | jq -r '.merge_commit_sha')
+      
+      if [[ "$merged" == "true" ]]; then
+        echo "✅ PR #${{ inputs.pull_number }} is confirmed merged!"
+        echo "Merge commit: $merge_commit_sha"
+        MERGED=true
+      else
+        echo "❌ Failed to merge PR after $MAX_RETRIES attempts"
+        exit 1
+      fi
+    fi
+    
+    if [[ "$MERGED" == "true" ]]; then
+      echo "========================================="
+      echo "🎉 PR #${{ inputs.pull_number }} successfully merged!"
+      echo "========================================="
+    fi
