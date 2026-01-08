@@ -38,3 +38,15 @@ on behalf of [Your Team Name]
 	•	仍保留了收件方必须行动的指引。
 
 是否希望我帮你加上 placeholder（例如旧 Nexus URL / 新 URL 的格式），让团队更容易理解要改的地方？
+
+Hi Team,
+
+Quick update on the HA Nexus migration — the new HA environment is now live. ITS has confirmed that access and proxy configuration are completed, and teams may now begin planning for Nexus endpoint updates.
+
+MTO is currently migrating key shared dependencies (analytics, localization, and foundation) to the new HA Nexus endpoint, and expects to have these updated by this week. Once completed, downstream teams will be able to validate and update their respective consumption paths.
+
+To ensure alignment, please incorporate this into your Q2 PI planning, targeting end of Q2 for completion of the transition.
+
+Thank you for your continued support.  
+Best,  
+Fei
