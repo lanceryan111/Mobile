@@ -13,7 +13,9 @@ Below are several benefits typically associated with Gitflow:
 5. Clear Commit History: The structured workflow helps maintain an organized history, making tracking and audits easier.
 6. Team Collaboration: Provides a predictable model for integration and testing, improving coordination across contributors.
 
-If the team is open to it, we can schedule a short discussion to evaluate whether adopting elements of this approach would bring value to our Soft Token workflow.
+Separately, I also noticed that the current pipeline does not include a Sonar scan step. My understanding is that Sonar scanning is required as part of our organization’s CI compliance standards. Could you help clarify whether there is an existing plan to integrate it, or if the requirement does not apply to Soft Token? Just want to make sure we are aligned with the broader org expectations.
+
+If the team is open to it, we can schedule a short discussion to evaluate whether adopting elements of Gitflow and aligning CI compliance would bring value to our workflow.
 
 Thanks,  
 Fei
