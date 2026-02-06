@@ -81,3 +81,52 @@ runs:
           echo "status=failed" >> $GITHUB_OUTPUT
           exit 1
         fi
+
+# Example Workflow
+
+# .github/workflows/example.yml
+name: Example Workflow
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: echo "Building..."
+
+      - name: Send success notification
+        if: success()
+        uses: ./.github/actions/send-email
+        with:
+          smtp_server: ${{ secrets.SMTP_SERVER }}
+          smtp_port: '587'
+          smtp_username: ${{ secrets.SMTP_USERNAME }}
+          smtp_password: ${{ secrets.SMTP_PASSWORD }}
+          sender: 'ci@yourcompany.com'
+          receivers: 'team@yourcompany.com,lead@yourcompany.com'
+          subject: '✅ Build Success - ${{ github.repository }}'
+          body: |
+            <h2>Build Successful</h2>
+            <p><strong>Repository:</strong> ${{ github.repository }}</p>
+            <p><strong>Branch:</strong> ${{ github.ref_name }}</p>
+            <p><strong>Commit:</strong> ${{ github.sha }}</p>
+            <p><strong>Author:</strong> ${{ github.actor }}</p>
+            <p><a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}">View Run</a></p>
+
+      - name: Send failure notification
+        if: failure()
+        uses: ./.github/actions/send-email
+        with:
+          smtp_server: ${{ secrets.SMTP_SERVER }}
+          smtp_password: ${{ secrets.SMTP_PASSWORD }}
+          sender: 'ci@yourcompany.com'
+          receivers: 'team@yourcompany.com'
+          subject: '❌ Build Failed - ${{ github.repository }}'
+          body_file: 'error_report.html'
+          max_retries: '5'
