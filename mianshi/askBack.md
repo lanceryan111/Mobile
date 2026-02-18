@@ -41,3 +41,17 @@ How would you describe the current architecture of the deposit/account services 
 我懂架构演进
 
 我在想系统设计
+
+⭐ 四、如果你时间只够问一个
+
+问这个（最保险）：
+
+If I joined, where do you think my platform and reliability background could have the most immediate impact?
+
+这个问题非常强，因为：
+
+把话题拉回你优势
+
+让他们想象你已经加入
+
+会触发他们说真实需求
