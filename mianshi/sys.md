@@ -354,6 +354,13 @@ AOS（存款账户运营服务）最在意的不是“炫技”，而是：
 60 天：负责一个小服务/模块的 feature + 事件消费；参与设计评审
 90 天：主导一次可靠性改造（幂等、重试、告警、对账自动化）或一次安全/CI 标准化推广
 
+My strength is helping critical systems become more reliable, secure, and easier to operate and deliver — which is exactly what matters most for transaction platforms like deposit services.
+What really interests me about this role is that it sits very close to business-critical systems. For deposit and account operations, the most important things aren’t fancy features — it’s making sure transactions are correct, traceable, and the system is always stable.
+
+In my current work, I’ve been focusing a lot on exactly those areas — improving release safety, automating security and compliance checks, strengthening monitoring and incident readiness, and helping teams deliver changes with lower operational risk.
+
+I’d like to move closer to the service and system design side so I can apply that reliability and delivery experience directly to core banking workflows. I think I can contribute quickly in making services safer and more operable, while continuing to grow deeper into the application layer.
+
 A) 6 个最可能的系统设计题（AOS 场景）
 1) 设计一个 “Deposit Account Ledger / Journals” 服务（核心题）
 
@@ -382,7 +389,30 @@ ingestion API → 验证/去重 → 事件流（Kafka）→ 多阶段处理器
 
 对账：和外部系统 daily reconciliation
 强调： pipeline 化、失败可恢复、可回放、监控指标
+2) Design an async pipeline for cheque processing / issued device / record management
 
+Spoken framework (60–90s):
+
+For cheque processing, I’d design it as an event-driven, multi-stage pipeline, because the workflow is naturally step-based and needs strong recovery and traceability.
+
+I’d start with an ingestion API that validates the request, normalizes key fields, and performs deduplication using an idempotency key or transaction ID. Once accepted, we persist the request with an initial status like PENDING and emit an event into Kafka.
+
+Downstream, I’d split processing into multiple stages — for example validation, enrichment, risk/compliance checks, posting, and notification — and each stage would be idempotent, retryable, and observable. Failures would follow a clear strategy: retries with exponential backoff, then DLQ for manual triage or automated replay.
+
+I’d model the workflow with a simple state machine like PENDING → PROCESSED → FAILED, and keep enough metadata to support replay and auditing. 
+Finally, I’d run daily reconciliation against external systems to confirm totals and catch any mismatches.
+
+The main goal is a pipeline that’s resilient, recoverable, replayable, and easy to operate with clear metrics and dashboards.
+
+Key phrases to drop (quick add-ons):
+
+“idempotent processing at every stage”
+
+“DLQ with a defined replay/runbook”
+
+“daily reconciliation as a safety net”
+
+“metrics per stage: throughput, lag, error rate, retry rate”
 3) “ATM/Branch settlement” 结算系统怎么做（跨系统一致性）
 
 框架：
@@ -405,6 +435,22 @@ consumer 幂等；schema 版本管理；eventual consistency
 失败：重试退避 + DLQ + replay 工具
 强调： 这是你平台背景最能加分的题
 
+4) Moving from synchronous API calls to event-driven architecture
+
+Spoken framework (45–75s):
+
+If we’re moving from synchronous APIs to an event-driven model, the main thing I’d focus on is ensuring reliable event publication and safe consumer processing.
+
+Instead of “write to the database and then directly publish a message,” I’d use the outbox pattern: we write the business change and the outbound event into the same local transaction, then a publisher component reads the outbox and publishes to Kafka. That prevents the classic failure mode where the DB write succeeds but the message publish fails.
+
+On the consumer side, I’d treat events as at-least-once delivery and enforce idempotency using event IDs and deduplication logic, plus schema versioning to support safe evolution. I’d also be clear that we’re accepting eventual consistency for downstream workflows, and we design UI or processes accordingly.
+
+For failures, I’d implement retries with exponential backoff, DLQs for poison messages, and a replay tool or controlled reprocessing flow, supported by monitoring and runbooks.
+
+Why this fits your background (one-liner you can add):
+
+This is an area where my platform background helps, because it’s as much about reliability, delivery safety, and operability as it is about code.
+
 5) “Cross-service / cross-data issues” 怎么定位和治理？
 
 框架：
@@ -415,7 +461,23 @@ consumer 幂等；schema 版本管理；eventual consistency
 
 再做治理：依赖分级、超时/重试策略、降级、容量管理
 强调： 你擅长的 Reliability/Observability 直接打满
+How to diagnose and govern cross-service / cross-data issues
 
+Spoken framework (60–90s):
+
+For cross-service and cross-data issues, I’d approach it in three layers: standards, observability, and governance.
+
+First, I’d establish standards so we can trace issues end-to-end: consistent trace IDs and correlation IDs across services, structured logging, and a unified error code taxonomy so we don’t lose meaning across boundaries.
+
+Second, I’d improve observability by defining SLOs and building dashboards and alerts tied to user-impact signals — latency, error rate, dependency health, and also business KPIs where relevant. Distributed tracing is key to pinpointing whether failures are coming from a specific dependency, a timeout configuration, or a resource bottleneck.
+
+Third, I’d govern reliability through clear dependency management: classify dependencies by criticality, apply timeouts and retry policies that match the dependency, add circuit breakers and graceful degradation where possible, and ensure capacity planning is proactive.
+
+The outcome is that incidents become easier to detect, faster to diagnose, and less likely to cascade across services.
+
+Quick add-on line (very “senior”):
+
+Cross-service issues are often operational problems first — standardization and observability usually unlock faster fixes than jumping straight to code changes.
 6) CI/CD + 安全合规：怎么在交易系统里做到高频发布又安全？
 
 框架：
