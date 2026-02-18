@@ -35,6 +35,14 @@ What I’m looking for next is to move closer to system-level design and broader
 From what I understand, AOS team supports some of the bank's most critical transactions and account operations, like journals, settlesments and cheque processing. those systems really sit at the core of how the bank functions day 2 day.
 This role feels like a natural step because it combines hands-on engineering with architecture thinking, and since I already understand TD’s environment, standards, and collaboration model, I believe I can contribute quickly while continuing to grow here.
 
+⭐ 追问4：
+“What are you strength?”
+
+My strength is helping critical systems become more reliable, secure, and easier to operate and deliver — which is exactly what matters most for transaction platforms like deposit services. What really interests me about this role is that it sits very close to business-critical systems. For deposit and account operations, the most important things aren’t fancy features — it’s making sure transactions are correct, traceable, and the system is always stable.
+
+In my current work, I’ve been focusing a lot on exactly those areas — improving release safety, automating security and compliance checks, strengthening monitoring and incident readiness, and helping teams deliver changes with lower operational risk.
+
+I’d like to move closer to the service and system design side so I can apply that reliability and delivery experience directly to core banking workflows. I think I can contribute quickly in making services safer and more operable, while continuing to grow deeper into the application layer.
 ✅ 二、如何弥补 分布式系统经验不足
 
 而是找：
