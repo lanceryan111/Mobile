@@ -415,4 +415,269 @@ GitHub 需要**异步计算** PR 的可合并状态。当你第一次请求 PR �
 - 使用 `${{ github.event.pull_request.url }}` 直接获取 PR 详情来验证合并状态
 - 添加了延迟（`sleep 2`）给 GitHub 时间处理合并操作
 
+
 这样即使遇到响应解析问题，只要 PR 被成功合并，workflow 就不会失败。​​​​​​​​​​​​​​​​
+
+```
+  - name: Check PR Status Before Merge
+    id: check_pr_status
+    run: |
+      echo "🔍 Checking PR ${{ env.PR_NUMBER }} status..."
+      API_URL="${{ env.GITHUB_API_URL }}/${{ env.REPO }}/pulls/${{ env.PR_NUMBER }}"
+      echo "API URL: $API_URL"
+      MAX_RETRIES=5
+      RETRY_DELAY=3
+
+      for i in $(seq 1 $MAX_RETRIES); do
+        echo "Attempt $i/$MAX_RETRIES..."
+        http_response=$(curl -s -w "\nHTTP_CODE:%{http_code}" -L \
+          -H "Accept: application/vnd.github+json" \
+          -H "Authorization: Bearer ${{ secrets.TDUNPIDPAT }}" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          "$API_URL")
+
+        http_code=$(echo "$http_response" | grep "HTTP_CODE:" | cut -d: -f2)
+        body=$(echo "$http_response" | grep -v "HTTP_CODE:")
+        echo "HTTP status code: $http_code"
+        state=$(echo "$body" | jq -r '.state')
+        mergeable=$(echo "$body" | jq -r '.mergeable')
+        mergeable_state=$(echo "$body" | jq -r '.mergeable_state')
+
+        echo "PR State: $state"
+        echo "Mergeable: $mergeable"
+        echo "Mergeable State: $mergeable_state"
+
+        if [ "$mergeable" != "null" ]; then
+          break
+        fi
+        echo "Mergeable is null, retrying in $RETRY_DELAY seconds..."
+        sleep $RETRY_DELAY
+      done
+
+      if [ "$state" != "open" ]; then
+        echo "❌ PR is not open (state: $state). Skipping."
+        echo "ready=false" >> $GITHUB_OUTPUT
+        exit 0
+      fi
+    shell: bash
+
+  - name: Check All Required Status Checks
+    id: check_runs_status
+    run: |
+      echo "🔍 Checking all check runs for PR #${{ env.PR_NUMBER }}..."
+
+      # Get PR head SHA
+      PR_URL="${{ env.GITHUB_API_URL }}/${{ env.REPO }}/pulls/${{ env.PR_NUMBER }}"
+      pr_body=$(curl -s -L \
+        -H "Accept: application/vnd.github+json" \
+        -H "Authorization: Bearer ${{ secrets.TDUNPIDPAT }}" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "$PR_URL")
+
+      HEAD_SHA=$(echo "$pr_body" | jq -r '.head.sha')
+      BASE_BRANCH=$(echo "$pr_body" | jq -r '.base.ref')
+      echo "HEAD SHA: $HEAD_SHA"
+      echo "Base Branch: $BASE_BRANCH"
+
+      # -------------------------------------------------------
+      # 1. Get all check runs for this commit
+      # -------------------------------------------------------
+      CHECK_RUNS_URL="${{ env.GITHUB_API_URL }}/${{ env.REPO }}/commits/${HEAD_SHA}/check-runs?per_page=100"
+      echo "Fetching check runs from: $CHECK_RUNS_URL"
+
+      check_runs_body=$(curl -s -L \
+        -H "Accept: application/vnd.github+json" \
+        -H "Authorization: Bearer ${{ secrets.TDUNPIDPAT }}" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "$CHECK_RUNS_URL")
+
+      total_count=$(echo "$check_runs_body" | jq -r '.total_count')
+      echo "Total check runs: $total_count"
+
+      # Print all check runs for debugging
+      echo ""
+      echo "========== All Check Runs =========="
+      echo "$check_runs_body" | jq -r '.check_runs[] | "  [\(.status)] \(.name) => \(.conclusion // "pending")"'
+      echo "===================================="
+      echo ""
+
+      # -------------------------------------------------------
+      # 2. Get required status checks from branch protection
+      # -------------------------------------------------------
+      PROTECTION_URL="${{ env.GITHUB_API_URL }}/${{ env.REPO }}/branches/${BASE_BRANCH}/protection/required_status_checks"
+      echo "Fetching required checks from: $PROTECTION_URL"
+
+      protection_body=$(curl -s -L \
+        -H "Accept: application/vnd.github+json" \
+        -H "Authorization: Bearer ${{ secrets.TDUNPIDPAT }}" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "$PROTECTION_URL")
+
+      protection_http_code=$(echo "$protection_body" | jq -r '.message // empty')
+
+      if [ -n "$protection_http_code" ]; then
+        echo "⚠️  Could not fetch branch protection rules: $protection_http_code"
+        echo "Falling back to checking ALL check runs..."
+        REQUIRED_CHECKS=""
+      else
+        # Extract required check names (from both 'contexts' and 'checks' arrays)
+        REQUIRED_CHECKS=$(echo "$protection_body" | jq -r '
+          ((.contexts // []) + ((.checks // []) | map(.context))) | unique | .[]
+        ')
+        echo "Required checks:"
+        echo "$REQUIRED_CHECKS" | while read -r check; do
+          [ -n "$check" ] && echo "  - $check"
+        done
+      fi
+
+      # -------------------------------------------------------
+      # 3. Validate check run results
+      # -------------------------------------------------------
+      FAILED=""
+      PENDING=""
+      PASSED=""
+
+      if [ -n "$REQUIRED_CHECKS" ]; then
+        # Check only required checks
+        echo ""
+        echo "Validating required checks..."
+        while IFS= read -r required_check; do
+          [ -z "$required_check" ] && continue
+
+          # Skip our own workflow to avoid circular dependency
+          if echo "$required_check" | grep -qi "auto.merge"; then
+            echo "  ⏭️  Skipping self: $required_check"
+            continue
+          fi
+
+          # Find this check in the check runs
+          check_status=$(echo "$check_runs_body" | jq -r --arg name "$required_check" '
+            .check_runs[] | select(.name == $name) | "\(.status)|\(.conclusion // "null")"
+          ' | head -1)
+
+          if [ -z "$check_status" ]; then
+            PENDING="${PENDING}${required_check} (not found yet)\n"
+          else
+            status=$(echo "$check_status" | cut -d'|' -f1)
+            conclusion=$(echo "$check_status" | cut -d'|' -f2)
+
+            if [ "$status" != "completed" ]; then
+              PENDING="${PENDING}${required_check} (${status})\n"
+            elif [ "$conclusion" = "success" ] || [ "$conclusion" = "skipped" ]; then
+              PASSED="${PASSED}${required_check}\n"
+            else
+              FAILED="${FAILED}${required_check} (${conclusion})\n"
+            fi
+          fi
+        done <<< "$REQUIRED_CHECKS"
+      else
+        # No required checks found - check ALL runs (excluding self)
+        echo ""
+        echo "No required checks defined. Validating all check runs..."
+        while IFS= read -r line; do
+          [ -z "$line" ] && continue
+          name=$(echo "$line" | cut -d'|' -f1)
+          status=$(echo "$line" | cut -d'|' -f2)
+          conclusion=$(echo "$line" | cut -d'|' -f3)
+
+          # Skip our own workflow
+          if echo "$name" | grep -qi "auto.merge"; then
+            echo "  ⏭️  Skipping self: $name"
+            continue
+          fi
+
+          if [ "$status" != "completed" ]; then
+            PENDING="${PENDING}${name} (${status})\n"
+          elif [ "$conclusion" = "success" ] || [ "$conclusion" = "skipped" ]; then
+            PASSED="${PASSED}${name}\n"
+          else
+            FAILED="${FAILED}${name} (${conclusion})\n"
+          fi
+        done <<< "$(echo "$check_runs_body" | jq -r '.check_runs[] | "\(.name)|\(.status)|\(.conclusion // "null")"')"
+      fi
+
+      # -------------------------------------------------------
+      # 4. Check review approval status
+      # -------------------------------------------------------
+      echo ""
+      echo "Checking review approval status..."
+      REVIEWS_URL="${{ env.GITHUB_API_URL }}/${{ env.REPO }}/pulls/${{ env.PR_NUMBER }}/reviews"
+      reviews_body=$(curl -s -L \
+        -H "Accept: application/vnd.github+json" \
+        -H "Authorization: Bearer ${{ secrets.TDUNPIDPAT }}" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "$REVIEWS_URL")
+
+      approved=$(echo "$reviews_body" | jq '[.[] | select(.state == "APPROVED")] | length')
+      echo "Approved reviews: $approved"
+
+      # -------------------------------------------------------
+      # 5. Final decision
+      # -------------------------------------------------------
+      echo ""
+      echo "========== Summary =========="
+      if [ -n "$PASSED" ]; then
+        echo "✅ Passed:"
+        echo -e "$PASSED" | while read -r line; do [ -n "$line" ] && echo "    $line"; done
+      fi
+      if [ -n "$PENDING" ]; then
+        echo "⏳ Pending:"
+        echo -e "$PENDING" | while read -r line; do [ -n "$line" ] && echo "    $line"; done
+      fi
+      if [ -n "$FAILED" ]; then
+        echo "❌ Failed:"
+        echo -e "$FAILED" | while read -r line; do [ -n "$line" ] && echo "    $line"; done
+      fi
+      echo "============================="
+
+      if [ -n "$FAILED" ]; then
+        echo "❌ Some checks have failed. Not ready to merge."
+        echo "ready=false" >> $GITHUB_OUTPUT
+        exit 0
+      fi
+
+      if [ -n "$PENDING" ]; then
+        echo "⏳ Some checks are still pending. Not ready to merge."
+        echo "ready=false" >> $GITHUB_OUTPUT
+        exit 0
+      fi
+
+      if [ "$approved" -lt 1 ]; then
+        echo "❌ PR has not been approved. Not ready to merge."
+        echo "ready=false" >> $GITHUB_OUTPUT
+        exit 0
+      fi
+
+      echo "✅ All checks passed and PR is approved! Ready to merge."
+      echo "ready=true" >> $GITHUB_OUTPUT
+    shell: bash
+
+  - name: Merge PR
+    if: steps.check_runs_status.outputs.ready == 'true'
+    run: |
+      echo "🚀 Merging PR #${{ env.PR_NUMBER }}..."
+      MERGE_URL="${{ env.GITHUB_API_URL }}/${{ env.REPO }}/pulls/${{ env.PR_NUMBER }}/merge"
+
+      merge_response=$(curl -s -w "\nHTTP_CODE:%{http_code}" -L \
+        -X PUT \
+        -H "Accept: application/vnd.github+json" \
+        -H "Authorization: Bearer ${{ secrets.TDUNPIDPAT }}" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        -d '{"merge_method": "squash"}' \
+        "$MERGE_URL")
+
+      merge_http_code=$(echo "$merge_response" | grep "HTTP_CODE:" | cut -d: -f2)
+      merge_body=$(echo "$merge_response" | grep -v "HTTP_CODE:")
+
+      echo "Merge HTTP code: $merge_http_code"
+      echo "Merge response: $merge_body"
+
+      if [ "$merge_http_code" = "200" ]; then
+        echo "✅ PR #${{ env.PR_NUMBER }} merged successfully!"
+      else
+        echo "❌ Failed to merge PR #${{ env.PR_NUMBER }}"
+        echo "Response: $merge_body"
+        exit 1
+      fi
+    shell: bash
+```
