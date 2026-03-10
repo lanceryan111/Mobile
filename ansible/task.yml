@@ -1,0 +1,45 @@
+---
+- name: Ensure watchdog script directory exists
+  ansible.builtin.file:
+    path: "{{ watchdog_install_dir }}"
+    state: directory
+    owner: "{{ runner_user }}"
+    group: "{{ runner_group }}"
+    mode: "0755"
+
+- name: Deploy check_runner.sh watchdog script
+  ansible.builtin.template:
+    src: check_runner.sh.j2
+    dest: "{{ watchdog_install_dir }}/check_runner.sh"
+    owner: "{{ runner_user }}"
+    group: "{{ runner_group }}"
+    mode: "0755"
+  notify: verify watchdog script
+
+- name: Ensure watchdog log file exists with correct permissions
+  ansible.builtin.file:
+    path: "{{ watchdog_log }}"
+    state: touch
+    owner: "{{ runner_user }}"
+    group: "{{ runner_group }}"
+    mode: "0644"
+  changed_when: false
+
+- name: Configure cron job for runner watchdog
+  ansible.builtin.cron:
+    name: "runner-watchdog-check"
+    minute: "*/{{ cron_interval }}"
+    job: "{{ watchdog_install_dir }}/check_runner.sh >> {{ watchdog_log }} 2>&1"
+    user: "{{ runner_user }}"
+    state: present
+
+- name: Add log rotation for watchdog log (macOS newsyslog)
+  ansible.builtin.lineinfile:
+    path: /etc/newsyslog.conf
+    line: "{{ watchdog_log }}\t{{ runner_user }}:{{ runner_group }}\t644\t5\t1024\t*\tZ"
+    regexp: "^{{ watchdog_log | regex_escape }}"
+    state: present
+  become: true
+  ignore_errors: true
+  tags:
+    - logrotate
