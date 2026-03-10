@@ -1,0 +1,16 @@
+---
+runner_user: ciusr
+runner_group: staff
+runner_home: "/Users/{{ runner_user }}"
+cilogs_dir: "{{ runner_home }}/cilogs"
+runner_dir: "{{ runner_home }}/cad-mob-macos"
+watchdog_install_dir: "{{ runner_home }}/scripts"
+watchdog_log: "/var/log/runner_watchdog.log"
+
+max_duration_seconds: 7200
+svc_timeout: 30
+cron_interval: 10
+
+email_enabled: "true"
+email_to: "your-team@td.com"
+email_from: "runner-watchdog@{{ inventory_hostname }}"
