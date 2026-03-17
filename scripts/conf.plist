@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>{{ launchagent_label }}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{ watchdog_install_dir }}/check_runner.sh</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>{{ check_interval }}</integer>
+    <key>StandardOutPath</key>
+    <string>{{ watchdog_log }}</string>
+    <key>StandardErrorPath</key>
+    <string>{{ watchdog_log }}</string>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
+
+cat > ~/Library/LaunchAgents/com.td.runner-watchdog.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.td.runner-watchdog</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/ciusr/scripts/check_runner.sh</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>600</integer>
+    <key>StandardOutPath</key>
+    <string>/var/log/runner_watchdog.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/log/runner_watchdog.log</string>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
+EOF
+
+# 加载（立即生效，重启后也会自动运行）
+launchctl load ~/Library/LaunchAgents/com.td.runner-watchdog.plist
+
+# 查看状态
+launchctl list | grep runner-watchdog
+
+# 如果要停掉
+launchctl unload ~/Library/LaunchAgents/com.td.runner-watchdog.plist
