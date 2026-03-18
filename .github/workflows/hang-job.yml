@@ -1,0 +1,65 @@
+# .github/workflows/test-hang-job.yml
+name: Test Hang Job
+
+on:
+  workflow_dispatch:
+    inputs:
+      hang_minutes:
+        description: 'How long to hang the job (minutes)'
+        required: true
+        default: '5'
+        type: choice
+        options:
+          - '1'
+          - '5'
+          - '30'
+          - '60'
+          - '120'
+          - '150'
+
+jobs:
+  hang-test:
+    runs-on: [self-hosted, macOS]
+    timeout-minutes: 180
+    steps:
+      - name: Print runner info
+        run: |
+          echo "Runner: $(hostname)"
+          echo "User: $(whoami)"
+          echo "PID: $$"
+          echo "Start time: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+          echo "Hang duration: ${{ inputs.hang_minutes }} minutes"
+
+      - name: Check cilogs before hang
+        run: |
+          LOGFILE="$HOME/cilogs/$(scutil --get LocalHostName).local.txt"
+          echo "Last 5 entries:"
+          tail -5 "$LOGFILE" 2>/dev/null || echo "No cilogs found"
+
+      - name: Simulate hung job
+        run: |
+          echo "Job hanging at: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+          echo "Will hang for ${{ inputs.hang_minutes }} minutes..."
+          echo "Watchdog should kill this if duration >= threshold"
+          echo "---"
+          
+          TOTAL_SECONDS=$(( ${{ inputs.hang_minutes }} * 60 ))
+          ELAPSED=0
+          INTERVAL=30
+          
+          while [ $ELAPSED -lt $TOTAL_SECONDS ]; do
+            sleep $INTERVAL
+            ELAPSED=$(( ELAPSED + INTERVAL ))
+            ELAPSED_MINS=$(( ELAPSED / 60 ))
+            echo "[$(date '+%H:%M:%S')] Still hanging... ${ELAPSED_MINS}m / ${{ inputs.hang_minutes }}m elapsed"
+          done
+          
+          echo "Hang completed without being killed by watchdog"
+
+      - name: Post-hang check (only runs if not killed)
+        if: always()
+        run: |
+          echo "Job ended at: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+          LOGFILE="$HOME/cilogs/$(scutil --get LocalHostName).local.txt"
+          echo "Last 5 cilogs entries:"
+          tail -5 "$LOGFILE" 2>/dev/null || echo "No cilogs found"
