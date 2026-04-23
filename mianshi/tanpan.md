@@ -1,4 +1,4 @@
-很好，这一步就是真正决定你能多拿多少钱 + 后续工作满意度的关键阶段🔥
+(很好，这一步就是真正决定你能多拿多少钱 + 后续工作满意度的关键阶段🔥
 我会给你一个可直接用的谈判策略 + 话术模板（针对TD这种银行环境）。
 
 ⸻
@@ -777,3 +777,12 @@ Is there flexibility on additional vacation?
 * 判断还能不能再 push
 * 给你“最优一句话回复”
 * 帮你稳住 offer + maximize钱 👍
+
+Thanks, I really appreciate you working on this.
+I understand there may be limited flexibility on the base.
+Would there be any flexibility on the overall package, such as a sign-on bonus or additional vacation?
+
+Thanks, I really appreciate you walking me through everything.
+I was hoping to get a bit closer to 150, but I understand the constraints.
+Overall, I’m very interested in the role and the team, so I’m comfortable moving forward with the offer.
+I’m excited to contribute and get started.
