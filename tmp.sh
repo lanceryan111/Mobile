@@ -1,27 +1,17 @@
-Hi Marcin and Jasmine,
+Hi Dharan,
 
-I put together an initial estimate based on the current information available. The timeline below assumes no major blockers and may be adjusted as we validate the environment and dependencies.
+Thanks for the context and for the note.
 
-Key assumptions / considerations:
+Just wanted to align on scope and expectations before I start estimating and planning the work.
 
-1. Machine readiness and environment validation
-    * Before starting implementation, I’d like to confirm the current machine status, configuration, and access readiness.
-2. Machine setup and configuration (~1 week)
-    * Once the environment is confirmed, initial machine setup and baseline configuration are expected to take approximately one week.
-3. CI pipeline setup (~2 weeks)
-    * Build and configure the CI pipeline from scratch, including validation and integration activities.
-4. Stabilization and issue resolution (~1 week)
-    * Allow time after initial setup for troubleshooting, tuning, and addressing integration issues.
+Could you help clarify whether the time-sensitive request is:
 
-Potential dependencies (if applicable):
+1. To leverage the existing CMOB runner infrastructure and build/configure the pipeline on top of that, or
+2. To configure the six AT Mac machines first and then establish the CI pipeline based on those machines?
 
-* Access approvals / environment readiness
-* Signing certificates / key management process
-* Cross-team coordination (e.g. infrastructure / platform support)
+The implementation approach and effort would be quite different between those two options.
 
-Current estimate: ~4 weeks end-to-end, subject to confirmation of assumptions above.
-
-Happy to walk through the breakdown or adjust based on additional context.
+Also, do we already have an expected timeline / target delivery date for these changes? Since this is marked as time-sensitive, understanding the expected timeline would help prioritize and determine the right level of setup vs. long-term solution.
 
 Thanks,
 Fei
